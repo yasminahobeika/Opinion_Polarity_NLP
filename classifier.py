@@ -1,33 +1,19 @@
 from typing import List
-import torch
+
 import pandas as pd
 import numpy as np
-import re
-import string
-import nltk.data
-import nltk
-from matplotlib import pyplot as plt
-# %matplotlib inline
-# Download English
-nltk.download('stopwords')
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, accuracy_score
-from sklearn.preprocessing import StandardScaler
+
 from sklearn.utils.class_weight import compute_class_weight
 
 pd.set_option('max_colwidth', None)
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 
-from transformers import RobertaTokenizer, RobertaModel, get_linear_schedule_with_warmup, \
-    get_cosine_schedule_with_warmup
+from transformers import RobertaTokenizer, RobertaModel, get_linear_schedule_with_warmup
 
 
 def roberta_preprocess(data):
@@ -55,17 +41,15 @@ def roberta_preprocess(data):
     data['Category'] = data['Main_Category'] + ' ' + data['Sub_Category']
 
     data['Text'] = data['Text'] + ' <s> ' + data['Category'] + ' </s>'
-    # data = data.drop(columns='Category')
 
     # Label Encoding Sentiment, Category, and Sub-Category
     data['Sentiment'] = data['Sentiment'].apply(
         lambda x: 2 if x == 'positive' else (1 if x == 'neutral' else 0))
-    # data['Main_Category_Label'] = data['Main_Category'].apply(lambda x: 1 if x == 'AMBIENCE' else (2 if x == 'FOOD' else (3 if x == 'SERVICE' else (4 if x == 'RESTAURANT' else (5 if x == 'DRINKS' else 6)))))
-    # data['Sub_Category_Label'] = data['Sub_Category'].apply(lambda x: 1 if x == 'GENERAL' else (2 if x == 'QUALITY' else (3 if x == 'STYLE_OPTIONS' else (4 if x == 'MISCELLANEOUS' else 5))))
-
     return data
 
+
 tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+
 
 class Classifier:
     """
@@ -73,7 +57,6 @@ class Classifier:
     __init__() function) and the 2 methods train() and predict() below. Please donot change
      """
 
-    ############################################# comp
     def train(self, train_filename: str, dev_filename: str, device: torch.device):
         """
         Trains the classifier model on the training set stored in file trainfile
@@ -87,8 +70,8 @@ class Classifier:
         # Prepare Data
         train = pd.read_csv(train_filename, sep='	', header=None)
         train = roberta_preprocess(train)
-        # test = pd.read_csv(dev_filename, sep='	', header=None)
-        # test = roberta_preprocess(test)
+        # dev = pd.read_csv(dev_filename, sep='	', header=None)
+        # dev = roberta_preprocess(dev)
 
         # tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
@@ -96,16 +79,16 @@ class Classifier:
         train['Mask'] = train['Text'].apply(
             lambda x: tokenizer(x, padding='max_length', max_length=100)['attention_mask'])
 
-        # test['Input'] = test['Text'].apply(lambda x: tokenizer(x, padding='max_length', max_length=100)['input_ids'])
-        # test['Mask'] = test['Text'].apply(
+        # dev['Input'] = dev['Text'].apply(lambda x: tokenizer(x, padding='max_length', max_length=100)['input_ids'])
+        # dev['Mask'] = dev['Text'].apply(
         #     lambda x: tokenizer(x, padding='max_length', max_length=100)['attention_mask'])
 
         X = train[['Input', 'Mask']]
         y = np.array(train['Sentiment'].tolist())
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # X_test = test[['Input', 'Mask']]
-        # y_test = np.array(test['Sentiment'].tolist())
+        # X_dev = dev[['Input', 'Mask']]
+        # y_dev = np.array(test['Sentiment'].tolist())
         train_dataset = torch.utils.data.TensorDataset(
             torch.tensor(np.array(X_train['Input'].tolist()), dtype=torch.long),
             torch.tensor(np.array(X_train['Mask'].tolist()), dtype=torch.long),
@@ -115,16 +98,16 @@ class Classifier:
                                                      torch.tensor(np.array(X_val['Mask'].tolist()), dtype=torch.long),
                                                      torch.tensor(y_val, dtype=torch.long))
 
-        # test_dataset = torch.utils.data.TensorDataset(
-        #     torch.tensor(np.array(X_test['Input'].tolist()), dtype=torch.long),
-        #     torch.tensor(np.array(X_test['Mask'].tolist()), dtype=torch.long),
-        #     torch.tensor(y_test, dtype=torch.long))
+        # dev_dataset = torch.utils.data.TensorDataset(
+        #     torch.tensor(np.array(X_dev['Input'].tolist()), dtype=torch.long),
+        #     torch.tensor(np.array(X_dev['Mask'].tolist()), dtype=torch.long),
+        #     torch.tensor(y_dev, dtype=torch.long))
 
         train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=2)
 
         val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=2)
 
-        # test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=2)
+        # dev_dataloader = torch.utils.data.DataLoader(dev_dataset, batch_size=32, shuffle=False, num_workers=2)
 
         roberta_model = RobertaModel.from_pretrained("roberta-base").to(device)
         '''
@@ -202,7 +185,7 @@ class Classifier:
             return epoch_list, scores_list
 
         ### Max number of epochs
-        max_epochs = 41
+        max_epochs = 21
 
         ### DEFINE LOSS FUNCTION
         class_weights = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
@@ -214,7 +197,7 @@ class Classifier:
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=2e-5)
         scheduler = get_linear_schedule_with_warmup(optimizer, 0, max_epochs * len(train_dataloader))
         _, _ = exec_train(self.model, self.loss_fcn, device, optimizer, max_epochs, train_dataloader,
-                                               val_dataloader)
+                          val_dataloader)
 
     def predict(self, data_filename: str, device: torch.device) -> List[str]:
         """Predicts class labels for the input instances in file 'datafile'
@@ -225,33 +208,25 @@ class Classifier:
         """
         data = pd.read_csv(data_filename, sep='	', header=None)
         data = roberta_preprocess(data)
-        # tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
         data['Input'] = data['Text'].apply(lambda x: tokenizer(x, padding='max_length', max_length=100)['input_ids'])
         data['Mask'] = data['Text'].apply(
             lambda x: tokenizer(x, padding='max_length', max_length=100)['attention_mask'])
 
         X = data[['Input', 'Mask']]
-        # y = np.array(data['Sentiment'].tolist())
 
         dataset = torch.utils.data.TensorDataset(
             torch.tensor(np.array(X['Input'].tolist()), dtype=torch.long),
             torch.tensor(np.array(X['Mask'].tolist()), dtype=torch.long))
-            # torch.tensor(y, dtype=torch.long))
 
-        # inputs = torch.tensor(np.array(X['Input'].tolist()), dtype=torch.long)
-        # mask = torch.tensor(np.array(X['Mask'].tolist()), dtype=torch.long)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False, num_workers=2)
 
-        self.model = self.model.to(device)
-        self.model.eval()
+        model = self.model.to(device)
+        model.eval()
         predict = []
         for i, batch in enumerate(dataloader):
-          inputs, mask = batch
-          output = self.model(inputs.to(device), mask.to(device))
-          predict += torch.argmax(output, axis=1).tolist()
+            inputs, mask = batch
+            output = model(inputs.to(device), mask.to(device))
+            predict += torch.argmax(output, axis=1).tolist()
 
         return ['positive' if x == 2 else 'neutral' if x == 1 else 'negative' for x in predict]
-
-
-
