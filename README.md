@@ -1,7 +1,14 @@
 # Natural Language Processing Assignment - Opinion Polarity Sentiment Analysis Task
 
 ## Authors
-The project is done by [Darius CHUA](https://github.com/darius-chua), [Karim EL HAGE](https://github.com/karimelhage), [Yasmina HOBEIKA](https://github.com/yasminahobeika), [DEEPESH DWIVEDI](https://github.com/deepesh-dwivedi)
+The project is done by [Darius CHUA](https://github.com/darius-chua), [Karim EL HAGE](https://github.com/karimelhage), [Yasmina HOBEIKA](https://github.com/yasminahobeika), [Deepesh DWIVEDI](https://github.com/deepesh-dwivedi)
+
+### Results
+
+The average accuracy on the dev set provided after conducting 5 runs from scratch:
+
+- Accuracy: **87.93%**
+- Exec Time: **2048.87s (409 per run)**
 
 
 
@@ -10,7 +17,7 @@ The project is done by [Darius CHUA](https://github.com/darius-chua), [Karim EL 
 
 This sentiment analysis classifier is designed to predict the sentiment of a given text as either 'positive', 'neutral', or 'negative'. The model leverages the pre-trained RoBERTa (Robustly optimized BERT approach) model, which is a variation of the popular BERT model. RoBERTa is an advanced language understanding model known for its strong performance on a wide range of natural language processing tasks.
 
-### Pre-Processing
+### 2. Pre-Processing
 
 The input data undergoes several preprocessing steps before being fed into the model:
 
@@ -36,10 +43,3 @@ The model is trained using the following procedure:
 4. Optimizer: The AdamW optimizer with a learning rate of 2e-5 is employed for model training.
 5. Scheduler: A linear learning rate scheduler with warmup is utilized to optimize the learning rate during training.
 6. Training loop: The model is trained for a total of 21 epochs. Performance is evaluated on the validation set every 5 epochs using the accuracy score as the evaluation metric.
-
-### 5. Results
-
-The average accuracy on the dev set provided after conducting 5 runs from scratch:
-
-- Accuracy: 87.55%
-- Exec Time: 2048.87s (409 per run)
