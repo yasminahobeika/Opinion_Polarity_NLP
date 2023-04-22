@@ -70,25 +70,16 @@ class Classifier:
         # Prepare Data
         train = pd.read_csv(train_filename, sep='	', header=None)
         train = roberta_preprocess(train)
-        # dev = pd.read_csv(dev_filename, sep='	', header=None)
-        # dev = roberta_preprocess(dev)
-
-        # tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
         train['Input'] = train['Text'].apply(lambda x: tokenizer(x, padding='max_length', max_length=100)['input_ids'])
         train['Mask'] = train['Text'].apply(
             lambda x: tokenizer(x, padding='max_length', max_length=100)['attention_mask'])
 
-        # dev['Input'] = dev['Text'].apply(lambda x: tokenizer(x, padding='max_length', max_length=100)['input_ids'])
-        # dev['Mask'] = dev['Text'].apply(
-        #     lambda x: tokenizer(x, padding='max_length', max_length=100)['attention_mask'])
 
         X = train[['Input', 'Mask']]
         y = np.array(train['Sentiment'].tolist())
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # X_dev = dev[['Input', 'Mask']]
-        # y_dev = np.array(test['Sentiment'].tolist())
         train_dataset = torch.utils.data.TensorDataset(
             torch.tensor(np.array(X_train['Input'].tolist()), dtype=torch.long),
             torch.tensor(np.array(X_train['Mask'].tolist()), dtype=torch.long),
@@ -98,22 +89,12 @@ class Classifier:
                                                      torch.tensor(np.array(X_val['Mask'].tolist()), dtype=torch.long),
                                                      torch.tensor(y_val, dtype=torch.long))
 
-        # dev_dataset = torch.utils.data.TensorDataset(
-        #     torch.tensor(np.array(X_dev['Input'].tolist()), dtype=torch.long),
-        #     torch.tensor(np.array(X_dev['Mask'].tolist()), dtype=torch.long),
-        #     torch.tensor(y_dev, dtype=torch.long))
 
         train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=2)
 
         val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=2)
 
-        # dev_dataloader = torch.utils.data.DataLoader(dev_dataset, batch_size=32, shuffle=False, num_workers=2)
-
         roberta_model = RobertaModel.from_pretrained("roberta-base").to(device)
-        '''
-        for param in Roberta.parameters():
-            param.requires_grad = False
-        '''
 
         class Model(nn.Module):
 
@@ -122,7 +103,6 @@ class Classifier:
 
                 self.roberta = roberta.to(device_name)
                 self.l1 = nn.Linear(in_features=768, out_features=768)
-                # self.relu = nn.ReLU(inplace=True)
                 self.drop = nn.Dropout(p=0.1)
                 self.l2 = nn.Linear(in_features=768, out_features=3)
 
@@ -130,7 +110,6 @@ class Classifier:
                 x = self.roberta(x, attention_mask)
                 x = x.pooler_output
                 x = self.l1(x)
-                # x = self.relu(x)
                 x = self.drop(x)
                 x = self.l2(x)
 
@@ -143,6 +122,7 @@ class Classifier:
             epoch_list = []
             scores_list = []
             lowest_loss = 1
+            highest_accuracy = 0
 
             # loop over epochs
             for epoch in range(max_epochs):
@@ -160,32 +140,35 @@ class Classifier:
                     optimizer.step()
                     losses.append(loss.item())
                 loss_data = np.array(losses).mean()
+
+                score_list_batch = []
+
+                model.eval()
+                with torch.no_grad():
+                    for i, batch in enumerate(dataloader_val):
+                        inputs, mask, labels = batch
+                        output = model(inputs.to(device_name), mask.to(device_name))
+                        loss_test = loss_fcn(output, labels.to(device_name))
+                        predict = torch.argmax(output, axis=1)
+                        score = accuracy_score(labels.cpu().numpy(), predict.cpu().numpy())
+                        score_list_batch.append(score)
+
+                score = np.array(score_list_batch).mean()
+
+                if score > highest_accuracy:
+                    highest_accuracy = score
+                    best_param = model.state_dict()
+
+                print("Accuracy-Score: {:.4f}".format(score))
+                scores_list.append(score)
+                epoch_list.append(epoch)
+
                 print("Epoch {:05d} | Loss: {:.4f}".format(epoch, loss_data))
 
-                if epoch % 5 == 0:
-                    # evaluate the model on the validation set
-                    # computes the f1-score
-                    score_list_batch = []
-
-                    model.eval()
-                    with torch.no_grad():
-                        for i, batch in enumerate(dataloader_val):
-                            inputs, mask, labels = batch
-                            output = model(inputs.to(device_name), mask.to(device_name))
-                            loss_test = loss_fcn(output, labels.to(device_name))
-                            predict = torch.argmax(output, axis=1)
-                            score = accuracy_score(labels.cpu().numpy(), predict.cpu().numpy())
-                            score_list_batch.append(score)
-
-                    score = np.array(score_list_batch).mean()
-                    print("Accuracy-Score: {:.4f}".format(score))
-                    scores_list.append(score)
-                    epoch_list.append(epoch)
-
-            return epoch_list, scores_list
+            return epoch_list, scores_list, best_param
 
         ### Max number of epochs
-        max_epochs = 21
+        max_epochs = 20
 
         ### DEFINE LOSS FUNCTION
         class_weights = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
@@ -196,8 +179,10 @@ class Classifier:
         ### DEFINE OPTIMIZER
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=2e-5)
         scheduler = get_linear_schedule_with_warmup(optimizer, 0, max_epochs * len(train_dataloader))
-        _, _ = exec_train(self.model, self.loss_fcn, device, optimizer, max_epochs, train_dataloader,
+        _, _, best_param = exec_train(self.model, self.loss_fcn, device, optimizer, max_epochs, train_dataloader,
                           val_dataloader)
+        
+        self.model.load_state_dict(best_param)
 
     def predict(self, data_filename: str, device: torch.device) -> List[str]:
         """Predicts class labels for the input instances in file 'datafile'
