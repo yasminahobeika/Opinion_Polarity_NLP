@@ -24,7 +24,7 @@ The input data undergoes several preprocessing steps before being fed into the m
 1. Renaming columns: The columns in the input data are renamed for easier understanding and manipulation.
 2. Lowercasing: Both the 'Text' and 'Subject' columns are lowercased to reduce the impact of case differences on the model.
 3. Special token insertion: Special tokens are inserted into the text to help the model understand the structure of the input. Namely for the location of the part of the Text that cause the sentiment as well as its aspect category. 
-4. Label encoding: Sentiment labels are numerically encoded for model compatibility (positive: 2, neutral: 1, negative: 0).
+4. Label Encoding: Sentiment labels are numerically encoded for model compatibility (positive: 2, neutral: 1, negative: 0).
 
 ### 3. Model Architecture
 
