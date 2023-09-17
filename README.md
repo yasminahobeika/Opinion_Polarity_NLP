@@ -3,6 +3,10 @@
 ## Authors
 The project is done by [Darius CHUA](https://github.com/darius-chua), [Karim EL HAGE](https://github.com/karimelhage), [Yasmina HOBEIKA](https://github.com/yasminahobeika), [Deepesh DWIVEDI](https://github.com/deepesh-dwivedi)
 
+<a href="https://github.com/yasminahobeika/Opinion_Polarity_NLP/graphs/contributors"> 
+  <img src="https://contrib.rocks/image?repo=yasminahobeika/Opinion_Polarity_NLP" />
+</a>
+
 ## Results
 The average accuracy on the dev set provided after conducting 5 runs from scratch:
 
